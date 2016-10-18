@@ -1,0 +1,160 @@
+<div style="width:300px; height:220px;">
+  <div style="display:none;"><table jput="t_tmp_2" style="border:1px">
+	<tbody jput="tbody_templ"><tr><td style="font-weight:bold;">{{name}}</td><td>{{bv}}</td><td>{{nv}}</td><td>{{ct}}</td></tr></tbody></table>
+  </div>    
+	<script data-require="jquery@1.11.1" data-semver="1.11.1" src="https://code.jquery.com/jquery-1.11.1.min.js"   integrity="sha256-VAvG3sHdS5LqTT+5A/aeq/bZGa/Uj04xKxY8KM/w9EE="   crossorigin="anonymous"></script>
+	<script src="jput.min.js"data-source="https://plugins.jquery.com/jput/" ></script>
+	<style>
+table {    border-collapse: collapse;}
+table,th, td {   border: 1px solid black;}
+div#iponame{font-weight: bold; height:20px;}
+td{ width:45px; text-align:right; padding:5px;}
+.main p, ol, ul, li, a, tr, td,div {
+    font-size: 13px;
+    font-family: Verdana,Geneva,Tahoma,Arial,Helvetica,sans-serif;
+}
+</style>
+  <div id="iponame"></div>
+  <div id="ShowResults">
+	  <table>    
+		<thead>
+			<tr>
+				<th>-</th><th>BSE</th><th>NSE</th><th>Total</th>
+			</tr>
+		</thead>	  
+		<tbody id="targetTable"></tbody>
+	  </table>	  
+  </div>
+  <div id="lastCalcAt" style="margin-top:3px;"></div>  
+  <script type="text/javascript">
+/* 
+* This software is created by Nilesh (https://github.com/nilez) and is provided as is without taking assuming liability from it.
+* This shared under GNU license. You are free to use/modify it with appropriate credits.*
+*/  
+// Categories defined, you can change the order of the categories if, source sites change them using "v" variable. 
+// Categories not would automatically be hidden.
+var cats =[{"c":"QIB","v":1},{"c":"NII","v":2},{"c":"RII","v":3},{"c":"EMP","v":4},{"c":"RES","v":5}];
+
+// Currently following url are served with SAMEORIGIN policy, so it would be advisable to route 
+// through your proxy server and list the corrosponding urls of your server here.
+// To enable debugging you can use: CORS Extension in chrome available here: https://chrome.google.com/webstore/detail/allow-control-allow-origi/nlfbmbojpeacfghkpbjhddihlkkiljbi?hl=en
+// Set the Access-Control-Expose-Headers values to "Origin: localhost"
+var defs =[{"url":'http://www.bseindia.com/markets/publicIssues/BSEDemandSchedule_new.aspx?Scripcode=1249'}
+	      ,{"url":'https://www.nseindia.com/products/content/equities/ipos/GNA_curr_ipo_bid_details.htm'}];
+		  
+// List IPO dates in given format here, for widget to automatically load the data from server at every seconds mentioned in the Interval value.		  
+var dates = {start:'October 13, 2016 09:00:00', end: 'October 20, 2016 23:59:00', interval: 120};
+
+var catWeight;
+var lastUpdatedDate=new Date();
+var ipoName;			
+			var procssNSEWithCats = function(response){			
+				var domP = new DOMParser();
+				var hDoc = domP.parseFromString(response,"text/html"); 
+				$(hDoc).find("tr td:nth-child(1)").each(function(i,ele){
+					$.each(cats,function(j,catitem){
+						if(Number($(ele).text())===catitem.v){							
+							var avail =$(ele).nextAll().eq(1).text().split(',').join('');
+							var times =$(ele).nextAll().eq(3).text();							
+							var catName=catitem.c;
+							if(avail.trim().replace('-','')!=''){								
+								catWeight.push({name:catName,index:catitem.v,a:Number(avail),p:0,nv:Number(Number(times).toFixed(2))});
+							}
+						}
+					});
+				});				
+			};
+			var repeatBetweenDates = function(doWidgetFunction){
+				var s = new Date(dates.start);
+				var e = new Date(dates.end);
+				var now = new Date();				
+				if(s<=now && e>=now){
+					setInterval(function(){ doWidgetFunction();}, dates.interval*1000);
+					setInterval(function(){ doTime(lastUpdatedDate);}, 2000);
+				}else {
+					$("#lastCalcAt").text('');
+				}
+			};
+			var processBSEWithoutCat = function(response){				
+				var domP = new DOMParser();
+				var hDoc = domP.parseFromString(response,"text/html"); 
+				$(hDoc).find("tr td:nth-child(1)").each(function(i,ele){
+					$.each(catWeight,function(j,catitem){
+						if(Number($(ele).text())===catitem.index){
+							var times =$(ele).nextAll().eq(3).text();
+							catWeight[catitem.index-1].bv=Number(Number(times).toFixed(2));
+						}else if($(ele).text().includes('Last updated on')){
+							ipoName =$(ele).text().substr(0,$(ele).text().indexOf('Last updated on'));
+						}
+					});								
+				});				
+			};
+			var doTime = function(time){
+				var s = new Date(dates.start);
+				var e = new Date(dates.end);
+				var now = new Date();				
+				if(s<=now && e>=now){
+					$("#lastCalcAt").text(doReadabletime(time));				
+				}
+			};
+			var doReadabletime= function(time){
+				var timeDiff = dates.interval - Math.round((+new Date - Number(time))/1000);
+				var min=60, hr=60*min,day=24*hr;				
+				if(timeDiff<min){
+					return 'Next update in '+timeDiff+'s.'
+				}else{timeDiff<hr}{					
+					var m=Math.floor(timeDiff/min);
+					var s=timeDiff-m*60;
+					return 'Next update in '+m+'m'+s+'s.'
+				}				
+			};
+			var doError = function(a,b,c){
+				$("#targetTable").html('');
+				$("#iponame").show();
+				$("#iponame").text("Unable to get any data from BSE and/or NSE.");
+				$("#lastCalcAt").hide();
+			};
+			var doWebCall = function(currUrl){				
+				return $.ajax({
+					url:currUrl,
+					error:doError					
+				});				
+			};
+			var doWidget =function(){
+				catWeight=[];
+				$("#ShowResults").hide();
+				var getBSE = doWebCall(defs[0].url);
+				var getNSE = doWebCall(defs[1].url);
+				$.when(getBSE,getNSE).done(function(br){						
+					lastUpdatedDate = new Date();
+					console.log('Got latest now!!' + lastUpdatedDate.toGMTString());
+					procssNSEWithCats(br);
+					processBSEWithoutCat(br);
+					var ta=0,lastIndex=0,total=0, bt=0, nt=0;
+					$.each(catWeight,function(i,e){
+						ta+=e.a;lastIndex++;
+						e.ct=Number((e.bv+e.nv).toFixed(2));
+					});
+					$.each(catWeight,function(i,e){
+						e.p=Number((e.a*100/ta).toFixed(2));						
+						bt+=Number(((e.bv)*e.p/100).toFixed(2));
+						nt+=Number(((e.nv)*e.p/100).toFixed(2));						
+					});
+					catWeight.push({a:ta,p:100,index:lastIndex+1,name:'Total',bv:Number((bt).toFixed(2)),nv:Number((nt).toFixed(2)),ct:Number((bt+nt).toFixed(2))})
+					$("#iponame").text(ipoName);
+					$("#targetTable").html('');
+					$("#targetTable").jPut({
+						jsonData:catWeight,
+						name:"tbody_templ"
+					});
+					$("#ShowResults").show();
+					$("#lastCalcAt").show();
+					doTime(lastUpdatedDate);
+				});							
+			};
+			$(document).ready(function(){					
+				doWidget();
+				repeatBetweenDates(doWidget);
+			});					
+	</script>
+	</div>	
