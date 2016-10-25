@@ -30,6 +30,7 @@ td{ width:45px; text-align:right; padding:5px;}
 /* 
 * This software is created by Nilesh (https://github.com/nilez) and is provided as is without taking assuming liability from it.
 * This shared under GNU license. You are free to use/modify it with appropriate credits.*
+* The code is available at : https://github.com/nilez/ipo-demand-widget
 */  
 // Categories defined, you can change the order of the categories if, source sites change them using "v" variable. 
 // Categories not would automatically be hidden.
@@ -39,11 +40,11 @@ var cats =[{"c":"QIB","v":1},{"c":"NII","v":2},{"c":"RII","v":3},{"c":"EMP","v":
 // through your proxy server and list the corrosponding urls of your server here.
 // To enable debugging you can use: CORS Extension in chrome available here: https://chrome.google.com/webstore/detail/allow-control-allow-origi/nlfbmbojpeacfghkpbjhddihlkkiljbi?hl=en
 // Set the Access-Control-Expose-Headers values to "Origin: localhost"
-var defs =[{"url":'http://www.bseindia.com/markets/publicIssues/BSEDemandSchedule_new.aspx?Scripcode=1249'}
-	      ,{"url":'https://www.nseindia.com/products/content/equities/ipos/GNA_curr_ipo_bid_details.htm'}];
+var defs =[{"url":'http://www.bseindia.com/markets/publicIssues/BSEDemandSchedule_new.aspx?Scripcode=2282'}
+	      ,{"url":'https://www.nseindia.com/products/content/equities/ipos/PNBHF_curr_ipo_bid_details.htm'}];
 		  
 // List IPO dates in given format here, for widget to automatically load the data from server at every seconds mentioned in the Interval value.		  
-var dates = {start:'October 13, 2016 09:00:00', end: 'October 20, 2016 23:59:00', interval: 120};
+var dates = {start:'October 25, 2016 08:00:00', end: 'October 27, 2016 23:59:59', interval: 40};
 
 var catWeight;
 var lastUpdatedDate=new Date();
@@ -55,10 +56,10 @@ var ipoName;
 					$.each(cats,function(j,catitem){
 						if(Number($(ele).text())===catitem.v){							
 							var avail =$(ele).nextAll().eq(1).text().split(',').join('');
-							var times =$(ele).nextAll().eq(3).text();							
+							var times =$(ele).nextAll().eq(2).text().split(',').join('');
 							var catName=catitem.c;
 							if(avail.trim().replace('-','')!=''){								
-								catWeight.push({name:catName,index:catitem.v,a:Number(avail),p:0,nv:Number(Number(times).toFixed(2))});
+								catWeight.push({name:catName,index:catitem.v,a:Number(avail),p:0,nv:Number(Number(Number(times)/Number(avail)).toFixed(4))});
 							}
 						}
 					});
@@ -82,7 +83,7 @@ var ipoName;
 					$.each(catWeight,function(j,catitem){
 						if(Number($(ele).text())===catitem.index){
 							var times =$(ele).nextAll().eq(3).text();
-							catWeight[catitem.index-1].bv=Number(Number(times).toFixed(2));
+							catWeight[catitem.index-1].bv=Number(Number(times).toFixed(4));							
 						}else if($(ele).text().includes('Last updated on')){
 							ipoName =$(ele).text().substr(0,$(ele).text().indexOf('Last updated on'));
 						}
@@ -125,22 +126,22 @@ var ipoName;
 				$("#ShowResults").hide();
 				var getBSE = doWebCall(defs[0].url);
 				var getNSE = doWebCall(defs[1].url);
-				$.when(getBSE,getNSE).done(function(br){						
+				$.when(getBSE,getNSE).done(function(br,nr){						
 					lastUpdatedDate = new Date();
 					console.log('Got latest now!!' + lastUpdatedDate.toGMTString());
-					procssNSEWithCats(br);
+					procssNSEWithCats(nr);
 					processBSEWithoutCat(br);
 					var ta=0,lastIndex=0,total=0, bt=0, nt=0;
 					$.each(catWeight,function(i,e){
 						ta+=e.a;lastIndex++;
-						e.ct=Number((e.bv+e.nv).toFixed(2));
+						e.ct=Number((e.bv+e.nv).toFixed(4));
 					});
 					$.each(catWeight,function(i,e){
 						e.p=Number((e.a*100/ta).toFixed(2));						
-						bt+=Number(((e.bv)*e.p/100).toFixed(2));
-						nt+=Number(((e.nv)*e.p/100).toFixed(2));						
+						bt+=e.bv*e.p/100;
+						nt+=e.nv*e.p/100;						
 					});
-					catWeight.push({a:ta,p:100,index:lastIndex+1,name:'Total',bv:Number((bt).toFixed(2)),nv:Number((nt).toFixed(2)),ct:Number((bt+nt).toFixed(2))})
+					catWeight.push({a:ta,p:100,index:lastIndex+1,name:'Total',bv:Number((bt).toFixed(4)),nv:Number((nt).toFixed(4)),ct:Number((bt+nt).toFixed(4))})
 					$("#iponame").text(ipoName);
 					$("#targetTable").html('');
 					$("#targetTable").jPut({
